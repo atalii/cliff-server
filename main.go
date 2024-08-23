@@ -173,7 +173,15 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST /register", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/register", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/register/ios", http.StatusMovedPermanently)
+	})
+
+	mux.HandleFunc("/register/ios", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+
 		// Register this device with this Tailscale user
 		who, err := lc.WhoIs(r.Context(), r.RemoteAddr)
 		if err != nil {
@@ -210,11 +218,6 @@ func main() {
 				ApnsToken:              apnsToken,
 			}
 		}
-	})
-
-	mux.HandleFunc("/register", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
 	})
 
 	mux.HandleFunc("GET /send", func(w http.ResponseWriter, r *http.Request) {
