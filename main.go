@@ -35,32 +35,10 @@ type SendJsonBody struct {
 	Body string `json:"body"`
 }
 
-func main() {
-	flag.Parse()
-
-	if *apnsKey == "" {
-		flag.PrintDefaults()
-		log.Fatal("Must provide a path to the APNs key file (can use the CLIFF_APNS_KEY_PATH env var)")
-	}
-	if *keyID == "" {
-		flag.PrintDefaults()
-		log.Fatal("Must provide the ID of the APNs key (can use the CLIFF_APNS_KEY_ID env var)")
-	}
-	if *teamID == "" {
-		flag.PrintDefaults()
-		log.Fatal("Must provide the ID of the team signing the app (can use the CLIFF_APNS_TEAM_ID env var)")
-	}
-	if *bundleID == "" {
-		flag.PrintDefaults()
-		log.Fatal("Must provide the bundle ID of the app recieving notifications (can use the CLIFF_APP_BUNDLE_ID env var)")
-	}
-
-	// MARK: - APNs client setup
-	log.Printf("[1/5] Creating APNs client")
-
+func setupAPNs(client **apns2.Client) error {
 	authKey, err := token.AuthKeyFromFile(*apnsKey)
 	if err != nil {
-		log.Fatal("Token key error:", err)
+		return err
 	}
 
 	token := &token.Token{
@@ -68,11 +46,36 @@ func main() {
 		KeyID:   *keyID,
 		TeamID:  *teamID,
 	}
-	client := apns2.NewTokenClient(token)
+
+	*client = apns2.NewTokenClient(token)
 	if *development {
-		client.Development() // default for now, but setting in case the default changes
+		(*client).Development() // default for now, but setting in case the default changes
 	} else {
-		client.Production()
+		(*client).Production()
+	}
+
+	return nil
+}
+
+func main() {
+	var iosSupport bool
+
+	flag.Parse()
+
+	iosSupport = *apnsKey != "" && *keyID != "" && *teamID != "" && *bundleID != ""
+	if !iosSupport {
+		log.Printf("All of apns-key, key-id, team-id, and bundle-id required to register iOS devices.")
+		log.Printf("iOS support will not be enabled.")
+	}
+
+	// MARK: - client setup
+	log.Printf("[1/5] Initializing notification services.")
+
+	var client *apns2.Client
+	if iosSupport {
+		if err := setupAPNs(&client); err != nil {
+			log.Fatalf("failed setup of APNs: %v", err)
+		}
 	}
 
 	// MARK: - Tailscale setup
